@@ -2,7 +2,6 @@ package ru.stitchonfire.vncproxy.config;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.reactive.config.EnableWebFlux;
@@ -26,10 +25,10 @@ public class WebSocketConfig implements WebFluxConfigurer {
     public SimpleUrlHandlerMapping handlerMapping(@Value("${vnc.servers}") List<String> ips) {
         Map<String, WebSocketHandler> map = new HashMap<>();
 
-        for (int i = 0; i < ips.size(); i++) {
-            String[] split = ips.get(i).split(":");
-            map.put(UUID.randomUUID().toString(), new VncWebSocketHandler(split[0], Integer.parseInt(split[1])));
-        }
+        ips.forEach(ip -> {
+            String[] split = ip.split(":");
+            map.put("/ws/" + UUID.randomUUID(), new VncWebSocketHandler(split[0], Integer.parseInt(split[1])));
+        });
 
         SimpleUrlHandlerMapping handlerMapping = new SimpleUrlHandlerMapping();
         handlerMapping.setOrder(10);
