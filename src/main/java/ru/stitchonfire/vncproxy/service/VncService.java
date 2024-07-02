@@ -9,6 +9,7 @@ import reactor.core.publisher.Mono;
 import ru.stitchonfire.vncproxy.dto.VncDto;
 import ru.stitchonfire.vncproxy.handler.VncWebSocketHandler;
 
+import java.time.Duration;
 import java.util.List;
 
 @Service
@@ -18,7 +19,7 @@ public class VncService {
     SimpleUrlHandlerMapping urlHandlerMapping;
 
     public Mono<List<VncDto>> getVncData() {
-        return Mono.just(urlHandlerMapping.getUrlMap().entrySet()
+        return Mono.delay(Duration.ofSeconds(1)).then(Mono.just(urlHandlerMapping.getUrlMap().entrySet()
                 .stream()
                 .map(e -> {
                     VncWebSocketHandler handler = (VncWebSocketHandler) e.getValue();
@@ -28,6 +29,6 @@ public class VncService {
                             .build();
                 })
                 .toList()
-        );
+        ));
     }
 }
