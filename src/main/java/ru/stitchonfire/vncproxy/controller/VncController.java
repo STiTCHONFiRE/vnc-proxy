@@ -4,9 +4,11 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Mono;
+import ru.stitchonfire.vncproxy.dto.UsersDto;
 import ru.stitchonfire.vncproxy.dto.VncDto;
 import ru.stitchonfire.vncproxy.service.VncService;
 
@@ -19,8 +21,13 @@ import java.util.List;
 public class VncController {
     VncService vncService;
 
-    @GetMapping()
+    @GetMapping
     public Mono<List<VncDto>> getVncData() {
         return vncService.getVncData();
+    }
+
+    @GetMapping("{id}/users")
+    public Mono<UsersDto> getUserById(@PathVariable("id") String id) {
+        return vncService.getUsers(id);
     }
 }

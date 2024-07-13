@@ -5,16 +5,46 @@ import org.springframework.web.reactive.socket.CloseStatus;
 import org.springframework.web.reactive.socket.WebSocketHandler;
 import org.springframework.web.reactive.socket.WebSocketMessage;
 import org.springframework.web.reactive.socket.WebSocketSession;
+import org.springframework.web.util.UriComponentsBuilder;
 import reactor.core.publisher.Mono;
 import reactor.netty.tcp.TcpClient;
+import ru.stitchonfire.vncproxy.service.TokenService;
+import ru.stitchonfire.vncproxy.service.VncService;
+import ru.stitchonfire.vncproxy.type.WebSocketType;
+
+import java.net.URI;
+import java.util.UUID;
 
 @Slf4j
-public record VncWebSocketHandler(String TCP_SERVER_HOST, int TCP_SERVER_PORT) implements WebSocketHandler {
+public record VncWebSocketHandler(
+        UUID id,
+        String tcpServerHost,
+        int tcpServerPort,
+        TokenService tokenService,
+        VncService vncService
+) implements WebSocketHandler {
+
     @Override
     public Mono<Void> handle(WebSocketSession session) {
-        return TcpClient.create().host(TCP_SERVER_HOST).port(TCP_SERVER_PORT).connect()
-                .doOnSubscribe(subscription -> log.info("Connecting to TCP server {}:{}", TCP_SERVER_HOST, TCP_SERVER_PORT))
-                .doOnSuccess(connection -> log.info("Connected to TCP server {}:{}", TCP_SERVER_HOST, TCP_SERVER_PORT))
+        URI uri = session.getHandshakeInfo().getUri();
+
+        String token = UriComponentsBuilder.fromUri(uri)
+                .build()
+                .getQueryParams()
+                .getFirst("token");
+
+        if (token == null || !tokenService().authenticate(token, WebSocketType.VNC)) {
+            return session.close(CloseStatus.SERVER_ERROR);
+        }
+
+        String username = this.tokenService.getUsername(token);
+        if (username == null || username.isBlank()) {
+            return session.close(CloseStatus.SERVER_ERROR);
+        }
+
+        return TcpClient.create().host(tcpServerHost).port(tcpServerPort).connect()
+                .doOnSubscribe(subscription -> log.info("Connecting to TCP server {}:{}", tcpServerHost, tcpServerPort))
+                .doOnSuccess(connection -> log.info("Connected to TCP server {}:{}", tcpServerHost, tcpServerPort))
                 .doOnError(error -> log.error("Error connecting to TCP server: {}", error.getMessage()))
                 .flatMap(connection -> {
                     // WebSocket => TCP
@@ -22,7 +52,7 @@ public record VncWebSocketHandler(String TCP_SERVER_HOST, int TCP_SERVER_PORT) i
                             .doOnSubscribe(subscription -> log.info("Receiving messages from WebSocket session: {}", session.getId()))
                             .doOnComplete(() -> {
                                 log.info("WebSocket session completed: {}", session.getId());
-                                log.info("TCP connection {}:{} is disposing", TCP_SERVER_HOST, TCP_SERVER_PORT);
+                                log.info("TCP connection {}:{} is disposing", tcpServerHost, tcpServerPort);
                                 connection.dispose();
                             })
                             .doOnError(error -> {
@@ -42,7 +72,7 @@ public record VncWebSocketHandler(String TCP_SERVER_HOST, int TCP_SERVER_PORT) i
                     // TCP => WebSocket
                     Mono<Void> outbound = connection.inbound().receive()
                             .doOnSubscribe(subscription -> log.info("Receiving messages from TCP connection"))
-                            .doOnComplete(() -> log.info("TCP connection {}:{} completed", TCP_SERVER_HOST, TCP_SERVER_PORT))
+                            .doOnComplete(() -> log.info("TCP connection {}:{} completed", tcpServerHost, tcpServerPort))
                             .doOnError(error -> log.error("Error in TCP connection: {}", error.getMessage()))
                             .flatMap(buffer -> {
                                 byte[] bytes = new byte[buffer.readableBytes()];
@@ -58,7 +88,12 @@ public record VncWebSocketHandler(String TCP_SERVER_HOST, int TCP_SERVER_PORT) i
                             .then();
 
                     return Mono.when(inbound, outbound)
+                            .doOnSubscribe(s -> {
+                                log.info("DONE!!!");
+                                vncService.addUser(id, username);
+                            })
                             .doFinally(signal -> {
+                                vncService.removeUser(id, username);
                                 log.info("WebSocket session closed: {}", session.getId());
                                 log.info("TCP is disposed: {}", connection.isDisposed());
                             });
