@@ -17,7 +17,7 @@ import java.util.UUID;
 
 @Slf4j
 public record VncWebSocketHandler(
-        UUID id,
+        UUID vncId,
         String tcpServerHost,
         int tcpServerPort,
         TokenService tokenService,
@@ -26,6 +26,7 @@ public record VncWebSocketHandler(
 
     @Override
     public Mono<Void> handle(WebSocketSession session) {
+        log.info("Handling session {}", session);
         URI uri = session.getHandshakeInfo().getUri();
 
         String token = UriComponentsBuilder.fromUri(uri)
@@ -33,12 +34,7 @@ public record VncWebSocketHandler(
                 .getQueryParams()
                 .getFirst("token");
 
-        if (token == null || !tokenService().authenticate(token, WebSocketType.VNC)) {
-            return session.close(CloseStatus.SERVER_ERROR);
-        }
-
-        String username = this.tokenService.getUsername(token);
-        if (username == null || username.isBlank()) {
+        if (token == null || !tokenService().authenticate(token, vncId, WebSocketType.VNC)) {
             return session.close(CloseStatus.SERVER_ERROR);
         }
 
@@ -88,17 +84,12 @@ public record VncWebSocketHandler(
                             .then();
 
                     return Mono.when(inbound, outbound)
-                            .doOnSubscribe(s -> {
-                                log.info("DONE!!!");
-                                vncService.addUser(id, username);
-                            })
                             .doFinally(signal -> {
-                                vncService.removeUser(id, username);
                                 log.info("WebSocket session closed: {}", session.getId());
                                 log.info("TCP is disposed: {}", connection.isDisposed());
                             });
                 }).onErrorResume(error -> {
-                    log.error("Closing WebSocket session with id {} due to error: {}", session.getId(), error.getMessage());
+                    log.error("Closing WebSocket session with vncId {} due to error: {}", session.getId(), error.getMessage());
                     return session.close(CloseStatus.SERVER_ERROR);
                 });
     }

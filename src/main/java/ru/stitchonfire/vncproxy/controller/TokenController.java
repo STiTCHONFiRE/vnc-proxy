@@ -4,6 +4,7 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -20,9 +21,9 @@ import java.security.Principal;
 public class TokenController {
     TokenService tokenService;
 
-    @PostMapping
-    public Mono<TokenDto> getToken(@AuthenticationPrincipal Principal principal) {
-        return tokenService.generateToken(principal);
+    @PostMapping("{id}")
+    public Mono<TokenDto> getToken(@PathVariable String id, @AuthenticationPrincipal Principal principal) {
+        return tokenService.generateToken(id, principal);
     }
 }
 

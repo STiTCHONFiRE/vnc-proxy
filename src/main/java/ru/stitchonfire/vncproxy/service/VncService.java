@@ -3,8 +3,9 @@ package ru.stitchonfire.vncproxy.service;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.web.reactive.handler.SimpleUrlHandlerMapping;
+import org.springframework.web.reactive.socket.WebSocketHandler;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 import ru.stitchonfire.vncproxy.dto.UserEventDto;
@@ -16,22 +17,23 @@ import ru.stitchonfire.vncproxy.type.UserEventType;
 import java.time.Duration;
 import java.util.*;
 
+@Slf4j
 @Service
-@RequiredArgsConstructor()
+@RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class VncService {
-    SimpleUrlHandlerMapping urlHandlerMapping;
+    List<WebSocketHandler> webSocketHandlers = new ArrayList<>();
     Map<UUID, Set<String>> connectedUsers = new HashMap<>();
     Map<UUID, Sinks.Many<UserEventDto>> sinks = new HashMap<>();
 
     public Mono<List<VncDto>> getVncData() {
-        return Mono.delay(Duration.ofSeconds(1)).then(Mono.just(urlHandlerMapping.getUrlMap().values()
+        return Mono.delay(Duration.ofSeconds(1)).then(Mono.just(webSocketHandlers
                 .stream()
                 .filter(v -> v instanceof VncWebSocketHandler)
                 .map(v -> {
                     VncWebSocketHandler handler = (VncWebSocketHandler) v;
                     return VncDto.builder()
-                            .id(handler.id().toString())
+                            .id(handler.vncId().toString())
                             .ipAddressAndPort(handler.tcpServerHost() + ":" + handler.tcpServerPort())
                             .build();
                 })
@@ -49,7 +51,7 @@ public class VncService {
     }
 
     public Sinks.Many<UserEventDto> getSink(UUID id) {
-        sinks.putIfAbsent(id, Sinks.many().multicast().onBackpressureBuffer());
+        sinks.putIfAbsent(id, Sinks.many().replay().latest());
         return sinks.get(id);
     }
 
@@ -75,4 +77,6 @@ public class VncService {
                         .build()
         );
     }
+
+    public void addWebSocketHandler(WebSocketHandler webSocketHandler) { webSocketHandlers.add(webSocketHandler); }
 }

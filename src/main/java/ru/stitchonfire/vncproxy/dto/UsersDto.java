@@ -5,6 +5,6 @@ import lombok.Builder;
 import java.util.Set;
 
 @Builder
-public class UsersDto {
-    Set<String> usernames;
+public record UsersDto(Set<String> usernames) {
+
 }

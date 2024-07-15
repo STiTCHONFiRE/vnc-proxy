@@ -8,6 +8,7 @@ import java.util.UUID;
 @Builder
 public record TokenDto(
         UUID token,
+        String queryParameterName,
         Instant expiredAt
 ) {
 }

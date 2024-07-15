@@ -35,8 +35,12 @@ public class WebSocketConfig implements WebFluxConfigurer {
         ips.forEach(ip -> {
             String[] split = ip.split(":");
             UUID uuid = UUID.randomUUID();
-            map.put("/ws/" + uuid, new VncWebSocketHandler(uuid, split[0], Integer.parseInt(split[1]), tokenService, vncService));
-            map.put("/ws/users/" + uuid, new UserWebSocketHandler(uuid, tokenService, vncService, objectMapper));
+            WebSocketHandler vncHandler = new VncWebSocketHandler(uuid, split[0], Integer.parseInt(split[1]), tokenService, vncService);
+            WebSocketHandler userHandler = new UserWebSocketHandler(uuid, tokenService, vncService, objectMapper);
+            vncService.addWebSocketHandler(vncHandler);
+            vncService.addWebSocketHandler(userHandler);
+            map.put("/ws/" + uuid, vncHandler);
+            map.put("/ws/users/" + uuid, userHandler);
         });
 
         SimpleUrlHandlerMapping handlerMapping = new SimpleUrlHandlerMapping();
